@@ -15,6 +15,8 @@
 
 # Імпортуємо UserDict для гнучкої роботи зі словником
 from collections import UserDict
+# вічна класика для роботи з датами
+from datetime import datetime, timedelta
 
 # Читай документацію класу
 class Field:
@@ -47,11 +49,23 @@ class Phone(Field):
         if len(phone) == 10:
             super().__init__(phone)
 
+# Читай документацію класу
+class Birthday(Field):
+    '''Даний клас записує та запам'ятовує дату народження користувача, яка потім
+    використовуватиметься для того щоб знати коли його привітати'''
+    def __init__(self, value):
+        try: # проводимо валідацію нашої дати народження
+            format_to_date = datetime.strptime(value, '%d.%m.%Y').date()
+            super().__init__(format_to_date)
+        except ValueError as e:
+            raise ValueError('Invalid date format. Use DD.MM.YYYY') from e
+
 class Record:
     '''Клас для зберігання інформації про контакт, включаючи ім'я та список телефонів.'''
     def __init__(self, nam: str): # Отримує змінну, яку передає в об'єкт Name щоб зберегти як value
         self.name = Name(nam)
         self.phones = []
+        self.birthday = None
 # при виклику print() для даного об'єкта, він викличе str() який в свою чергу шукає __str__ в класі
 # тим самим при виклику тільки цього класу буде відображено як і ім'я так і номера телефонів
 # користувача
@@ -79,6 +93,10 @@ class Record:
             if p.value == phone:
                 return p # тут ми нічого не міняємо а повертаємо цілий об'єкт
 
+    def add_birthday(self, birthday: str):
+        '''Додає об'єкт дня народження в поле birthday'''
+        self.birthday = Birthday(birthday)
+
 class AddressBook(UserDict):
     '''Клас для зберігання та управління записами.'''
     def add_record(self, rec: Record):
@@ -92,3 +110,22 @@ class AddressBook(UserDict):
     def delete(self, nam: str):
         '''Видаляє користувача за іменем'''
         self.data.pop(nam)
+
+    def get_upcoming_birthdays(self) -> list[Record]:
+        '''Виводить список користувачів у яких день народження протягом наступного
+        тижня"'''
+        congratulations = list()
+        current_date = datetime.today().date() # витягуємо сьогоднішню дату
+        for user in self.data.values(): # проводим основні перевірки, рахуєм дельту
+            if user.birthday is None:
+                continue # пропускаємо якщо день народження не визначено
+            # Приводимо до актуального року
+            temp = user.birthday.value.replace(year=current_date.year)
+            differ = temp - current_date # рахуємо різницю в днях
+            if 0 <= differ.days <= 7: # якщо дельта в діапазоні
+                congrat_date = current_date + differ
+                # перевіряємо на день тижня, якщо вихідний, приводим до понеділка
+                if congrat_date.weekday() in (5, 6):
+                    congrat_date += timedelta(7 - congrat_date.weekday())
+                congratulations.append(user)
+        return congratulations # повертаємо сформований список Record у яких скоро день народження
