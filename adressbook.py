@@ -16,7 +16,7 @@
 # Імпортуємо UserDict для гнучкої роботи зі словником
 from collections import UserDict
 # вічна класика для роботи з датами
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Читай документацію класу
 class Field:
@@ -45,9 +45,11 @@ class Phone(Field):
     валідації а саме 10 знакам, якщо не відповідає то викидає помилку, ми можемо додати
     більше перевірок згодом, наприклад на те чи це дійсно цифри, чи якось перехоплювати
     помилки'''
-    def __init__(self, phone):
-        if len(phone) == 10:
+    def __init__(self, phone): # Додали додаткову перевірку на числа
+        if len(phone) == 10 and phone.isdigit():
             super().__init__(phone)
+        else:
+            raise ValueError('Length of phone must be equal 10, and be int type')
 
 # Читай документацію класу
 class Birthday(Field):
@@ -55,8 +57,8 @@ class Birthday(Field):
     використовуватиметься для того щоб знати коли його привітати'''
     def __init__(self, value):
         try: # проводимо валідацію нашої дати народження
-            format_to_date = datetime.strptime(value, '%d.%m.%Y').date()
-            super().__init__(format_to_date)
+            value = datetime.strptime(value, '%d.%m.%Y').date()
+            super().__init__(value)
         except ValueError as e:
             raise ValueError('Invalid date format. Use DD.MM.YYYY') from e
 
@@ -70,10 +72,14 @@ class Record:
 # тим самим при виклику тільки цього класу буде відображено як і ім'я так і номера телефонів
 # користувача
     def __str__(self):
-        return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
+        return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}\
+, birthday: {self.birthday}"
 
     def add_phone(self, phone: str):
         '''Метод додає номер телефону'''
+        for i in self.phones:
+            if phone == i.value:
+                raise ValueError('Phone number already exist, try another')
         obj_phone = Phone(phone) # спочатку потрібно створити об'єкт і присвоїти йому value
         self.phones.append(obj_phone) # тепер ми додаємо наш об'єкт в список
 
@@ -81,8 +87,10 @@ class Record:
         '''Знаходить старий номер телефону і замінює його на новий'''
         for phone in self.phones: # проходимось по кожному об'єку в списку телефонів користувача
         # якщо номер телефону знайдено то ми міняємо його значення value на нове значення value
-            if phone.value == old_phone:
+            if phone.value == old_phone and new_phone != phone.value:
                 phone.value = new_phone
+            else:
+                raise ValueError('New phone number already exist, try another')
 # Фактично тут можна було б додати більше перевірок, наприклад як поводитись якщо телефон не
 # знайдено але поки умова задачі цього не вимагає, ми не нагромаджуватимемо і додамо такі
 # методи пізніше аналогічно і з наступним методом find_phone
@@ -111,7 +119,7 @@ class AddressBook(UserDict):
         '''Видаляє користувача за іменем'''
         self.data.pop(nam)
 
-    def get_upcoming_birthdays(self) -> list[Record]:
+    def get_upcoming_birthdays(self) -> list[(Record, datetime.date)]:
         '''Виводить список користувачів у яких день народження протягом наступного
         тижня"'''
         congratulations = list()
@@ -123,9 +131,5 @@ class AddressBook(UserDict):
             temp = user.birthday.value.replace(year=current_date.year)
             differ = temp - current_date # рахуємо різницю в днях
             if 0 <= differ.days <= 7: # якщо дельта в діапазоні
-                congrat_date = current_date + differ
-                # перевіряємо на день тижня, якщо вихідний, приводим до понеділка
-                if congrat_date.weekday() in (5, 6):
-                    congrat_date += timedelta(7 - congrat_date.weekday())
-                congratulations.append(user)
+                congratulations.append((user, temp))
         return congratulations # повертаємо сформований список Record у яких скоро день народження
